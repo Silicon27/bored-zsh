@@ -2,6 +2,10 @@
 
 Silicon's terminal theme, Bored.
 
-preview:
+![preview.png](preview.png)
 
+
+Recommended settings for your terminal: 
+- Catppuccin Frappe theme
+- JetBrains Mono Font
 
