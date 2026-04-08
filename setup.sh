@@ -349,39 +349,88 @@ if [[ "$SKIP_WRITE" == n ]]; then
 fi
 
 # =============================================================================
-# Flip ZSH_THEME
+# .zshrc bootstrap
 # =============================================================================
 sec "Activating theme"
 
-# Ensure OMZ bootstrap lines exist in .zshrc
 if ! grep -q 'oh-my-zsh.sh' "$ZSHRC" 2>/dev/null; then
-  warn "OMZ bootstrap missing from ${ZSHRC} — adding it."
-  {
-    echo 'export ZSH="$HOME/.oh-my-zsh"'
-    echo 'source $ZSH/oh-my-zsh.sh'
-  } >> "$ZSHRC"
-  ok "Added OMZ bootstrap to ${ZSHRC}"
-fi
+  warn "No OMZ bootstrap found in ${ZSHRC}."
+  echo
+  info "The following lines are needed at the top of your .zshrc:"
+  echo
+  echo "    ${B}export ZSH=\"\$HOME/.oh-my-zsh\"${RST}"
+  echo "    ${B}ZSH_THEME=\"bored\"${RST}"
+  echo "    ${B}source \$ZSH/oh-my-zsh.sh${RST}"
+  echo
+  pick BOOTSTRAP_ACTION 1 "What do you want to do?" \
+    "Add them automatically (safe — prepends, doesn't touch existing content)" \
+    "Overwrite .zshrc entirely with just the bootstrap (wipes existing content)" \
+    "I'll add them myself — show me what to copy"
 
-if grep -q 'ZSH_THEME=' "$ZSHRC" 2>/dev/null; then
-  CURRENT=$(grep 'ZSH_THEME=' "$ZSHRC" | head -1 | sed 's/.*ZSH_THEME="\(.*\)".*/\1/')
-  if [[ "$CURRENT" == "bored" ]]; then
-    ok "ZSH_THEME is already \"bored\""
-  else
-    warn "Current theme: \"${CURRENT}\""
-    yesno FLIP "Switch ZSH_THEME to \"bored\"?" y
-    if [[ "$FLIP" == y ]]; then
-      cp "$ZSHRC" "${ZSHRC}.bak.$(date +%Y%m%d_%H%M%S)"
-      sed -i.tmp 's/ZSH_THEME=".*"/ZSH_THEME="bored"/' "$ZSHRC" && rm -f "${ZSHRC}.tmp"
-      ok "ZSH_THEME → \"bored\""
-    else
-      info "Set  ZSH_THEME=\"bored\"  in ${ZSHRC} manually when ready."
-    fi
-  fi
+  case "$BOOTSTRAP_ACTION" in
+    "Add them automatically"*)
+      [[ -f "$ZSHRC" ]] && cp "$ZSHRC" "${ZSHRC}.bak.$(date +%Y%m%d_%H%M%S)"
+      # Use a fixed temp file in $HOME to avoid mktemp/unbound issues
+      tmp="$HOME/.zshrc.tmp.$$"
+      {
+        echo 'export ZSH="$HOME/.oh-my-zsh"'
+        echo 'ZSH_THEME="bored"'
+        echo 'source $ZSH/oh-my-zsh.sh'
+        echo
+        [[ -f "$ZSHRC" ]] && cat "$ZSHRC"
+      } > "$tmp"
+      mv "$tmp" "$ZSHRC"
+      ok "Prepended OMZ bootstrap to ${ZSHRC}"
+      ;;
+    "Overwrite"*)
+      yesno CONFIRM_WIPE "${R}This will delete everything in ${ZSHRC}. Are you sure?${RST}" n
+      if [[ "$CONFIRM_WIPE" == y ]]; then
+        cat > "$ZSHRC" <<ZSHRC_CONTENT
+export ZSH="\$HOME/.oh-my-zsh"
+ZSH_THEME="bored"
+source \$ZSH/oh-my-zsh.sh
+ZSHRC_CONTENT
+        ok "Wrote clean .zshrc"
+      else
+        warn "Aborted. Nothing was changed."
+        info "Add the lines above to ${ZSHRC} manually before the next step."
+      fi
+      ;;
+    "I'll add them myself"*)
+      echo
+      echo "  Add these three lines to ${B}${ZSHRC}${RST}, at the top, before anything else:"
+      echo
+      echo "    ${B}export ZSH=\"\$HOME/.oh-my-zsh\"${RST}"
+      echo "    ${B}ZSH_THEME=\"bored\"${RST}"
+      echo "    ${B}source \$ZSH/oh-my-zsh.sh${RST}"
+      echo
+      warn "Skipping automatic .zshrc changes. Run setup again when done."
+      exit 0
+      ;;
+  esac
 else
-  # Insert ZSH_THEME before the source line so OMZ picks it up
-  sed -i.tmp 's|source \$ZSH/oh-my-zsh.sh|ZSH_THEME="bored"\nsource $ZSH/oh-my-zsh.sh|' "$ZSHRC" && rm -f "${ZSHRC}.tmp"
-  ok "Added ZSH_THEME=\"bored\" to ${ZSHRC}"
+  # OMZ is bootstrapped — just handle ZSH_THEME
+  if grep -q 'ZSH_THEME=' "$ZSHRC" 2>/dev/null; then
+    CURRENT=$(grep 'ZSH_THEME=' "$ZSHRC" | head -1 | sed 's/.*ZSH_THEME="\(.*\)".*/\1/')
+    if [[ "$CURRENT" == "bored" ]]; then
+      ok "ZSH_THEME is already \"bored\""
+    else
+      warn "Current theme: \"${CURRENT}\""
+      yesno FLIP "Switch ZSH_THEME to \"bored\"?" y
+      if [[ "$FLIP" == y ]]; then
+        cp "$ZSHRC" "${ZSHRC}.bak.$(date +%Y%m%d_%H%M%S)"
+        sed -i.tmp 's/ZSH_THEME=".*"/ZSH_THEME="bored"/' "$ZSHRC" && rm -f "${ZSHRC}.tmp"
+        ok "ZSH_THEME → \"bored\""
+      else
+        info "Add  ZSH_THEME=\"bored\"  to ${ZSHRC} manually, before the source line."
+      fi
+    fi
+  else
+    # Has OMZ source but no ZSH_THEME line — insert before source line
+    cp "$ZSHRC" "${ZSHRC}.bak.$(date +%Y%m%d_%H%M%S)"
+    sed -i.tmp 's|source \$ZSH/oh-my-zsh.sh|ZSH_THEME="bored"\nsource $ZSH/oh-my-zsh.sh|' "$ZSHRC" && rm -f "${ZSHRC}.tmp"
+    ok "Inserted ZSH_THEME=\"bored\" into ${ZSHRC}"
+  fi
 fi
 
 # =============================================================================
